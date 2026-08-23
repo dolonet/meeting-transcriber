@@ -148,7 +148,16 @@ extension AppMeetingPattern {
         meetingPatterns: [],
     )
 
-    static let all: [AppMeetingPattern] = [teams, zoom, webex, simulator, browserMeetings, wechat, tencentMeeting, faceTime, whatsApp]
+    /// Yandex Telemost's desktop client. Localized call-window titles (and no
+    /// stable English one) leave `meetingPatterns` empty, so titles fall back
+    /// to the placeholder like the other mic-detected apps here.
+    static let telemost = AppMeetingPattern(
+        appName: "Telemost",
+        ownerNames: ["Yandex.Telemost", "Яндекс Телемост", "Телемост"],
+        meetingPatterns: [],
+    )
+
+    static let all: [AppMeetingPattern] = [teams, zoom, webex, simulator, browserMeetings, wechat, tencentMeeting, faceTime, whatsApp, telemost]
 
     static let byName: [String: AppMeetingPattern] = {
         var dict: [String: AppMeetingPattern] = [:]

@@ -11,7 +11,7 @@ private let logger = Logger(subsystem: AppPaths.logSubsystem, category: "MicInpu
 ///
 /// Complements `PowerAssertionDetector` for call apps whose in-call power
 /// assertions are absent, unnamed, or undocumented (WeChat, Tencent Meeting,
-/// FaceTime, WhatsApp): a call ALWAYS captures the mic, so
+/// FaceTime, WhatsApp, Yandex Telemost): a call ALWAYS captures the mic, so
 /// `kAudioProcessPropertyIsRunningInput` flipping true on a watched bundle ID
 /// is a reliable signal.
 ///
@@ -63,6 +63,10 @@ class MicInputDetector: MeetingDetecting {
         // belongs to the browser detection channel.
         MicPattern(appName: "FaceTime", bundleIDs: ["com.apple.FaceTime", "com.apple.avconferenced"]),
         MicPattern(appName: "WhatsApp", bundleIDs: ["net.whatsapp.WhatsApp"]),
+        // Yandex Telemost: a single Qt process, no conference helper daemon in
+        // the shipping desktop build, an unnamed in-call power assertion and a
+        // localized window title — mic input is the signal that is left.
+        MicPattern(appName: "Telemost", bundleIDs: ["ru.yandex.desktop.telemost"]),
     ]
 
     /// The `defaultPatterns` subset selected by the user's "Apps to Watch"

@@ -154,6 +154,10 @@ final class AppSettings {
         didSet { defaults.set(watchWhatsApp, forKey: "watchWhatsApp") }
     }
 
+    var watchTelemost: Bool {
+        didSet { defaults.set(watchTelemost, forKey: "watchTelemost") }
+    }
+
     /// Auto-start watching on app launch.
     var autoWatch: Bool {
         didSet { defaults.set(autoWatch, forKey: "autoWatch") }
@@ -476,6 +480,7 @@ final class AppSettings {
         watchTencentMeeting = defaults.object(forKey: "watchTencentMeeting") as? Bool ?? false
         watchFaceTime = defaults.object(forKey: "watchFaceTime") as? Bool ?? false
         watchWhatsApp = defaults.object(forKey: "watchWhatsApp") as? Bool ?? false
+        watchTelemost = defaults.object(forKey: "watchTelemost") as? Bool ?? false
         autoWatch = defaults.object(forKey: "autoWatch") as? Bool ?? false
 
         pollInterval = defaults.object(forKey: "pollInterval") as? Double ?? 3.0

@@ -18,6 +18,7 @@ extension AppSettings {
         if watchTencentMeeting { apps.append(AppMeetingPattern.tencentMeeting.appName) }
         if watchFaceTime { apps.append(AppMeetingPattern.faceTime.appName) }
         if watchWhatsApp { apps.append(AppMeetingPattern.whatsApp.appName) }
+        if watchTelemost { apps.append(AppMeetingPattern.telemost.appName) }
         return apps
     }
 }

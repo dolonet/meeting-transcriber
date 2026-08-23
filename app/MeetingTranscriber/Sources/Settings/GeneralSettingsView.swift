@@ -41,6 +41,7 @@ struct GeneralSettingsView: View {
                 Toggle("Tencent Meeting", isOn: $settings.watchTencentMeeting)
                 Toggle("FaceTime", isOn: $settings.watchFaceTime)
                 Toggle("WhatsApp", isOn: $settings.watchWhatsApp)
+                Toggle("Yandex Telemost", isOn: $settings.watchTelemost)
                 Toggle("Browser Web Meetings", isOn: $settings.watchBrowserMeetings)
                     .accessibilityIdentifier(A11yID.watchBrowserToggle)
                 Text(
