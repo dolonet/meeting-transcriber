@@ -171,11 +171,38 @@ final class MicInputDetectorTests: XCTestCase {
     }
 
     func testPatternsWatchingFiltersBySelection() {
-        let all = MicInputDetector.patterns(watching: ["WeChat", "Tencent Meeting", "FaceTime", "WhatsApp"])
+        let all = MicInputDetector.patterns(watching: ["WeChat", "Tencent Meeting", "FaceTime", "WhatsApp", "Telemost"])
         XCTAssertEqual(all.count, MicInputDetector.defaultPatterns.count)
         let none = MicInputDetector.patterns(watching: [])
         XCTAssertTrue(none.isEmpty)
         let one = MicInputDetector.patterns(watching: ["WeChat"])
         XCTAssertEqual(one.map(\.appName), ["WeChat"])
+    }
+
+    /// Yandex Telemost publishes no named in-call power assertion and localizes
+    /// its call-window title, so mic input is the only signal left — the same
+    /// trade every other pattern in this detector makes. Bundle ID from the
+    /// shipping desktop build (`Yandex.Telemost.app`).
+    func testTelemostMicInputIsDetected() {
+        let detector = makeDetector()
+        detector.processProvider = { [snapshot("ru.yandex.desktop.telemost", pid: 777)] }
+
+        let result = detector.checkOnce()
+        XCTAssertEqual(result?.pattern.appName, "Telemost")
+        XCTAssertEqual(result?.windowPID, 777)
+        XCTAssertEqual(result?.windowTitle, "Telemost Call")
+    }
+
+    /// Opt-in like the rest of this channel: an install that did not tick
+    /// Telemost must not start recording when it takes the mic.
+    func testTelemostIsIgnoredWhenNotWatched() {
+        let detector = MicInputDetector(
+            patterns: MicInputDetector.patterns(watching: ["WeChat"]),
+            confirmationCount: 1,
+        )
+        detector.windowListProvider = { [] }
+        detector.processProvider = { [snapshot("ru.yandex.desktop.telemost")] }
+
+        XCTAssertNil(detector.checkOnce())
     }
 }
