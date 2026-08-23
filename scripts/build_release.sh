@@ -191,10 +191,20 @@ if [ "$NOTARIZE" = true ]; then
         xcrun stapler validate "$APP_BUNDLE"
     fi
 else
-    # Use local development certificate if available (extract 40-char hex SHA-1 hash)
-    SIGN_HASH=$(detect_sign_hash)
+    # Use local development certificate if available (extract 40-char hex SHA-1 hash).
+    # LOCAL_SIGN_IDENTITY overrides the search when `find-identity` cannot be
+    # trusted to pick the usable one: on a headless build host the login
+    # keychain's Apple Development key needs a GUI session, and codesign fails
+    # with errSecInternalComponent on it. LOCAL_SIGN_KEYCHAIN points at the
+    # keychain holding that identity.
+    SIGN_HASH="${LOCAL_SIGN_IDENTITY:-$(detect_sign_hash)}"
+    SIGN_KEYCHAIN_ARGS=()
+    if [ -n "${LOCAL_SIGN_KEYCHAIN:-}" ]; then
+        SIGN_KEYCHAIN_ARGS=(--keychain "$LOCAL_SIGN_KEYCHAIN")
+    fi
     if [ -n "$SIGN_HASH" ]; then
-        codesign --deep --force --sign "$SIGN_HASH" --entitlements "$ENTITLEMENTS" "$APP_BUNDLE"
+        codesign --deep --force --sign "$SIGN_HASH" "${SIGN_KEYCHAIN_ARGS[@]}" \
+            --entitlements "$ENTITLEMENTS" "$APP_BUNDLE"
         echo "  Signed with certificate: $SIGN_HASH"
     else
         codesign --deep --force --sign - --entitlements "$ENTITLEMENTS" "$APP_BUNDLE"
