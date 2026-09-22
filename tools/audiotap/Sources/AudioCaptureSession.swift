@@ -143,6 +143,7 @@ public class AudioCaptureSession {
             mic: .init(
                 recorded: micCapture != nil,
                 firstFrameTicks: micCapture?.firstFrameTime ?? 0,
+                timelineOriginSeconds: micCapture?.timelineAnchor.reliableOriginSeconds,
             ),
         )
 

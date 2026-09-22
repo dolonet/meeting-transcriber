@@ -55,6 +55,7 @@ extension WatchLoop {
             mixFilename: movedMix.lastPathComponent,
             appFilename: movedApp?.lastPathComponent,
             micFilename: movedMic?.lastPathComponent,
+            micMute: recording.micMute,
         )
         try sidecar.write(toDirectory: destDir, basename: basename)
         logger.info("Record-only: wrote sidecar + WAVs to \(destDir.path) for \(title, privacy: .private)")

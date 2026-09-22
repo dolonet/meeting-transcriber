@@ -40,7 +40,9 @@ final class RecordingSidecarTests: XCTestCase {
         let sidecar = makeFullSidecar()
         let dict = try encodeAsDict(sidecar)
 
-        XCTAssertEqual(dict["version"] as? Int, 2)
+        XCTAssertEqual(dict["version"] as? Int, 3)
+        XCTAssertEqual(dict["micMutePolicy"] as? String, "confirmed-unmuted-v1")
+        XCTAssertNotNil(dict["micMute"])
         XCTAssertEqual(dict["title"] as? String, "Standup")
         XCTAssertEqual(dict["appName"] as? String, "Microsoft Teams")
         XCTAssertEqual(dict["participants"] as? [String], ["Alice", "Bob"])
@@ -169,5 +171,35 @@ final class RecordingSidecarTests: XCTestCase {
             FileManager.default.attributesOfItem(atPath: url.path)[.posixPermissions] as? Int,
         )
         XCTAssertEqual(mode & 0o777, 0o600)
+    }
+
+    func testMuteTimelineRoundTripAndRecoveryFailClosed() throws {
+        let dir = try makeTempDirectory(prefix: "mute-sidecar")
+        let timeline = MicMuteTimeline(bundleID: "us.zoom.xos", observations: [
+            .init(timeSeconds: -0.2, state: .unknown),
+            .init(timeSeconds: 0.1, state: .unmuted),
+            .init(timeSeconds: 4.5, state: .muted),
+        ])
+        let sidecar = RecordingSidecar(
+            title: "Mute test", appName: "Zoom", startedAt: Date(), stoppedAt: Date(),
+            participants: [], micDelaySeconds: 0.7, trigger: .manual,
+            mixFilename: "mix.wav", appFilename: "app.wav", micFilename: "mic.wav",
+            micMute: timeline,
+        )
+        try sidecar.write(toDirectory: dir, basename: "mute")
+        let decoded = try XCTUnwrap(RecordingSidecar.read(fromDirectory: dir, basename: "mute"))
+        XCTAssertEqual(decoded.micMutePolicy, "confirmed-unmuted-v1")
+        XCTAssertEqual(decoded.micMute?.clock, "microphone-seconds")
+        XCTAssertEqual(decoded.micMute?.observations.map(\.timeSeconds), [-0.2, 0.1, 4.5])
+        XCTAssertEqual(decoded.micMute?.observations.map(\.state), [.unknown, .unmuted, .muted])
+        let recovered = makeFullSidecar()
+        XCTAssertEqual(recovered.micMutePolicy, "confirmed-unmuted-v1")
+        XCTAssertEqual(recovered.micMute?.observations.count, 0)
+    }
+
+    func testObserverWithoutReliableOriginCannotAuthoriseMicrophone() {
+        let observer = MicMuteObserver(pid: 0, bundleID: "us.zoom.xos")
+        XCTAssertTrue(observer.stop(microphoneOrigin: nil).observations.isEmpty)
+        XCTAssertTrue(observer.stop(microphoneOrigin: .nan).observations.isEmpty)
     }
 }

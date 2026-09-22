@@ -340,7 +340,7 @@ A red circle with a white "!" is composited in the bottom-right corner by `MenuB
 <img src="menu-bar-record-only.gif" width="80" alt="Record-only mode">
 </p>
 
-A persistent small red dot in the bottom-right corner indicates that **Record-only mode** is enabled (`AppSettings.recordOnly == true`). In this mode `WatchLoop.enqueueRecording()` moves dual-source WAVs into `<outputDir>/recordings/` together with a `<basename>_meta.json` `RecordingSidecar` and skips the entire post-processing pipeline (VAD, transcription, diarization, protocol). Intended for fleet topologies where macOS clients capture and a separate machine (e.g. a Linux GPU host via Syncthing) processes the audio. The sidecar's `trigger` field (`auto` | `manual`, schema version 2) tells that consumer which call site produced the recording, so it can treat a short auto-detected capture (likely a false trigger) differently from a short deliberate manual one.
+A persistent small red dot in the bottom-right corner indicates that **Record-only mode** is enabled (`AppSettings.recordOnly == true`). In this mode `WatchLoop.enqueueRecording()` moves dual-source WAVs into `<outputDir>/recordings/` together with a `<basename>_meta.json` `RecordingSidecar` and skips the entire post-processing pipeline (VAD, transcription, diarization, protocol). Intended for fleet topologies where macOS clients capture and a separate machine (e.g. a Linux GPU host via Syncthing) processes the audio. The sidecar's `trigger` field (`auto` | `manual`, introduced in schema version 2) tells that consumer which call site produced the recording, so it can treat a short auto-detected capture (likely a false trigger) differently from a short deliberate manual one.
 
 Like the permission badge, the dot is rendered as a persistent overlay on top of whatever primary animation is currently active — so the mode is always clearly indicated whether the app is idle, recording, or running anything else. **Precedence:** when both apply, the red exclamation (permission badge) wins, because a permission problem actually breaks recording while record-only is a deliberate user choice.
 
@@ -667,3 +667,33 @@ The overlay lives over the *currently active* animation (idle, recording, transc
 9. **Dual-track diarization** — App and mic tracks diarized separately, avoiding echo/cross-talk interference
 10. **Embedded debug RPC + automation API** — In-process HTTP server (`DebugRPCServer`) exposes state, resource metrics (`GET /metrics`), screenshot, and scene actions for shell-driven inspection and integration tests, plus a versioned `/v1` automation API (headless transcribe + job/naming control; reference in `docs/automation-api.md`). Off by default, opt-in via the `Settings → Advanced → Local Automation API` toggle or the `MEETINGTRANSCRIBER_DEBUG_RPC=1` env var, excluded from App Store builds via `#if !APPSTORE`. Action endpoints route through existing `Notification.Name` observers in `MeetingTranscriberApp`, so RPC-driven flows mirror real menu-bar paths.
 11. **No expensive work in SwiftUI hot paths** — view bodies, computed properties read by the body, and per-render closures must not call disk I/O, JSON decode, factory constructors, regex compilation, or other non-trivial work. SwiftUI re-renders on every `@State`/`@Observable` change and fans out aggressively, so what looks cheap once becomes a CPU pin fast. Push heavy values up: store as `@State`, inject as a stored property, or surface via an `@Observable` model. Caches that mirror the underlying source (e.g. `PipelineQueue.knownSpeakerNames` mirroring the speakers DB) must wire invalidation from every mutation site in the same PR — see issue #155 → PR #158 → PR #159 for the cautionary tale.
+
+
+### Record-only microphone mute timeline (schema 3)
+
+New sidecars carry `micMutePolicy` and `micMute`. For app + microphone captures,
+`confirmed-unmuted-v1` records read-only Accessibility observations of the local
+Zoom menu action (`onMuteAudio:`) or Telemost microphone checkbox. Unsupported
+apps, disabled or missing controls, conflicts, slow scans and missing permission
+produce `unknown`. A fresh AX tree is read every 250 ms; no previous unmuted state
+is reused. The enabled Zoom audio action is required: a visible but disabled
+command cannot authorise audio. Menu titles are explicitly allowlisted; other
+locales fail closed.
+
+`micMute` contains `schemaVersion: 1`, `clock: "microphone-seconds"`, `bundleID`
+and `observations: [{timeSeconds, state}]`. Times use hardware host time relative
+to the first sample of the raw mic WAV, before `micDelaySeconds`. The capture
+clock inserts silence for normal device restart gaps. Corrupt timestamps or large
+backwards jumps invalidate the origin; an invalid/missing origin yields an empty
+timeline. Recovery without observations also yields an empty timeline for dual
+tracks. Single-source recordings explicitly use `not-applicable`.
+
+The recorder preserves raw audio. The Notum importer must be upgraded to accept
+v2 + v3 **before** installing this writer. It masks the microphone before upload,
+allowing only continuous unmuted runs with observation gaps <=0.75 s, eroded by
+one second at both boundaries. Unknown and uncovered samples are zeroed. It
+keeps a local original FLAC, leaves app audio unchanged and never substitutes a
+raw mix for protected uploads. This is conservative UI observation, not a claim
+of sample-accurate network mute: short transitions may be missed and valid speech
+near boundaries may be omitted. Target-device acceptance must check actual audio,
+including Zoom push-to-talk, not just the timeline. Old sidecars remain readable.

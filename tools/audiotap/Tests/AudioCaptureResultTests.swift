@@ -150,4 +150,16 @@ final class AudioCaptureResultTests: XCTestCase {
         // must stay 0 rather than becoming the mic's own absolute timestamp.
         XCTAssertEqual(make(appURL: nil, appTicks: 0, micTicks: 5000).micDelay, 0)
     }
+
+    func testHardwareOriginIsPreservedIndependentlyOfCallbackDelay() {
+        for recorded in [true, false] {
+            let result = AudioCaptureResult.make(
+                appOutputURL: Self.appURL, micOutputURL: Self.micURL,
+                configured: (sampleRate: 16000, channels: 1),
+                app: .init(firstFrameTicks: 1000, sampleRate: 16000, channels: 1),
+                mic: .init(recorded: recorded, firstFrameTicks: 5000, timelineOriginSeconds: 123.45),
+            )
+            XCTAssertEqual(result.micTimelineOriginSeconds, recorded ? 123.45 : nil)
+        }
+    }
 }
