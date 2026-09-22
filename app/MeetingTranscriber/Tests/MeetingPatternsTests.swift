@@ -21,7 +21,8 @@ final class AppMeetingPatternTests: XCTestCase {
     // MARK: - All Patterns
 
     func testAllPatternsCount() {
-        XCTAssertEqual(AppMeetingPattern.all.count, 9)
+        XCTAssertEqual(AppMeetingPattern.all.count, 10)
+        XCTAssertEqual(AppMeetingPattern.forAppName("Telemost")?.ownerNames, ["Yandex.Telemost", "Яндекс Телемост", "Телемост"])
     }
 
     // MARK: - Browser meetings category (issue #503)
