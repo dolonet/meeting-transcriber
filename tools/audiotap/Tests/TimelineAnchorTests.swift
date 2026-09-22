@@ -52,4 +52,23 @@ final class TimelineAnchorTests: XCTestCase {
         _ = anchor.silenceFramesBefore(hostSeconds: 100.0, frameCount: 16000) // 1 s written
         XCTAssertEqual(anchor.silenceFramesBefore(hostSeconds: 100.5, frameCount: 1600), 0)
     }
+
+    func testInvalidClockNeverAuthorisesMicrophoneAgain() {
+        for timestamp in [Double.nan, Double.infinity, 7300.0, 90.0] {
+            var anchor = TimelineAnchor(rate: 16000)
+            _ = anchor.silenceFramesBefore(hostSeconds: 100, frameCount: 1600)
+            XCTAssertEqual(anchor.reliableOriginSeconds, 100)
+            _ = anchor.silenceFramesBefore(hostSeconds: timestamp, frameCount: 1600)
+            XCTAssertNil(anchor.reliableOriginSeconds)
+            _ = anchor.silenceFramesBefore(hostSeconds: 100.2, frameCount: 1600)
+            XCTAssertNil(anchor.reliableOriginSeconds)
+        }
+    }
+
+    func testOrdinaryRestartKeepsReliableFileOrigin() {
+        var anchor = TimelineAnchor(rate: 16000)
+        _ = anchor.silenceFramesBefore(hostSeconds: 100, frameCount: 1600)
+        XCTAssertEqual(anchor.silenceFramesBefore(hostSeconds: 103, frameCount: 1600), 46400)
+        XCTAssertEqual(anchor.reliableOriginSeconds, 100)
+    }
 }

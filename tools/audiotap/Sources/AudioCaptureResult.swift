@@ -15,6 +15,8 @@ public struct AudioCaptureResult: Sendable {
     public let actualChannels: Int
     /// Time delta between app and mic first frames (seconds, positive = mic started later).
     public let micDelay: TimeInterval
+    /// Hardware host-clock anchor of sample zero in the raw mic WAV.
+    public let micTimelineOriginSeconds: Double?
 
     /// A `public` struct's synthesized memberwise init is only `internal`, so
     /// other modules can't construct one — declare it `public` to complete the
@@ -25,12 +27,14 @@ public struct AudioCaptureResult: Sendable {
         actualSampleRate: Int,
         actualChannels: Int,
         micDelay: TimeInterval,
+        micTimelineOriginSeconds: Double? = nil,
     ) {
         self.appAudioFileURL = appAudioFileURL
         self.micAudioFileURL = micAudioFileURL
         self.actualSampleRate = actualSampleRate
         self.actualChannels = actualChannels
         self.micDelay = micDelay
+        self.micTimelineOriginSeconds = micTimelineOriginSeconds
     }
 }
 
@@ -47,6 +51,7 @@ extension AudioCaptureResult {
     struct MicReadings {
         let recorded: Bool
         let firstFrameTicks: UInt64
+        var timelineOriginSeconds: Double?
     }
 
     /// Builds the `AudioCaptureSession.stop()` result from the two tracks' raw
@@ -74,6 +79,7 @@ extension AudioCaptureResult {
             actualSampleRate: app.sampleRate > 0 ? app.sampleRate : configured.sampleRate,
             actualChannels: app.channels > 0 ? app.channels : configured.channels,
             micDelay: micDelay,
+            micTimelineOriginSeconds: mic.recorded ? mic.timelineOriginSeconds : nil,
         )
     }
 }

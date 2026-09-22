@@ -9,18 +9,6 @@ import os.log
 
 private let logger = Logger(subsystem: AppPaths.logSubsystem, category: "DualSourceRecorder")
 
-/// Result of a recording session.
-struct RecordingResult {
-    let mixPath: URL
-    let appPath: URL?
-    let micPath: URL?
-    let micDelay: TimeInterval
-    /// Wall-clock time recording started, captured directly in `start()`.
-    /// Not derived from `systemUptime` (which doesn't advance during sleep, so
-    /// a meeting spanning a sleep would skew the anchor) — this is exact.
-    let recordingStartDate: Date
-}
-
 /// The format `buildRecording` should expect the app track to arrive in, passed
 /// explicitly so the processing logic stays free of instance state (and
 /// unit-testable). `requested*` describe the file the capture session is
@@ -45,6 +33,7 @@ class DualSourceRecorder: RecordingProvider {
     private(set) var isRecording = false
     private(set) var recordingStartDate: Date = .distantPast
     private var startTimestamp: String?
+    private var muteObserver: MicMuteObserver?
 
     var appLevelDBFS: Double {
         captureSession?.appLevelDBFS ?? -120
@@ -417,6 +406,12 @@ class DualSourceRecorder: RecordingProvider {
         // root PID alone if the bundle URL is unavailable.
         let effectivePids = source.appPID.map { Self.resolveTapPIDs(rootPID: $0) } ?? []
 
+        if source.capturesMicrophone, let pid = source.appPID {
+            let bundleID = NSRunningApplication(processIdentifier: pid)?.bundleIdentifier ?? "unknown"
+            let observer = MicMuteObserver(pid: pid, bundleID: bundleID)
+            observer.start()
+            muteObserver = observer
+        }
         let session: any AudioCapturing
         do {
             session = try makeCaptureSession(AudioCaptureConfiguration(
@@ -438,6 +433,8 @@ class DualSourceRecorder: RecordingProvider {
             // mid-recording", and a start that never opened is not that.
             try? FileManager.default.removeItem(at: Self.inProgressMarker(stem: ts, in: recordingsDir))
             startTimestamp = nil
+            _ = muteObserver?.stop(microphoneOrigin: nil)
+            muteObserver = nil
             throw error
         }
         captureSession = session
@@ -464,6 +461,8 @@ class DualSourceRecorder: RecordingProvider {
         }
         let captureResult = session.stop()
         captureSession = nil
+        let micMute = muteObserver?.stop(microphoneOrigin: captureResult.micTimelineOriginSeconds)
+        muteObserver = nil
 
         let ts = startTimestamp ?? Self.timestamp()
         startTimestamp = nil
@@ -472,13 +471,15 @@ class DualSourceRecorder: RecordingProvider {
         // not the device-facing recordRate/appChannels — is the expected file
         // format; a buildRecording mismatch warning then means the resampler
         // fallback wrote raw native-rate audio.
-        let recording = try Self.buildRecording(
+        var recording = try Self.buildRecording(
             from: captureResult,
             recordingsDir: recordingsDir,
             timestamp: ts,
             recordingStartDate: recordingStartDate,
             format: CaptureFormat(requestedChannels: 1, requestedRate: targetRate, targetRate: targetRate),
         )
+
+        recording.micMute = micMute
 
         // Dropped only once the mix exists, exactly where `buildRecording`
         // drops the raw app temp. A stop whose mix write fails has not

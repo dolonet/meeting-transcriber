@@ -18,8 +18,14 @@ import Foundation
 /// callback context.
 struct TimelineAnchor {
     let rate: Int
-    private var anchorHostSeconds: Double?
+    private(set) var anchorHostSeconds: Double?
     private var framesWritten = 0
+    private(set) var isReliable = true
+
+    /// Only reliable clocks may authorise microphone samples for upload.
+    var reliableOriginSeconds: Double? {
+        isReliable ? anchorHostSeconds : nil
+    }
 
     /// Gaps beyond this are treated as a corrupt timestamp, not a real device
     /// outage: no silence is inserted (the write would be gigabytes of zeros on
@@ -37,14 +43,27 @@ struct TimelineAnchor {
     /// wall-clock. The first call sets the anchor and inserts nothing. Never
     /// negative — an early/jittered timestamp just appends.
     mutating func silenceFramesBefore(hostSeconds: Double, frameCount: Int) -> Int {
+        guard hostSeconds.isFinite, frameCount >= 0 else {
+            isReliable = false
+            return 0
+        }
         guard let anchor = anchorHostSeconds else {
             anchorHostSeconds = hostSeconds
             framesWritten = frameCount
             return 0
         }
-        let expected = Int(((hostSeconds - anchor) * Double(rate)).rounded())
-        let silence = max(0, expected - framesWritten)
+        let position = ((hostSeconds - anchor) * Double(rate)).rounded()
+        guard position.isFinite, position > Double(Int.min), position < Double(Int.max) else {
+            isReliable = false
+            framesWritten += frameCount
+            return 0
+        }
+        let expected = Int(position)
+        // A large backwards jump cannot be represented by silence padding.
+        if position < Double(framesWritten) - 0.25 * Double(rate) { isReliable = false }
+        let silence = expected > framesWritten ? expected - framesWritten : 0
         guard silence <= Int(Self.maxGapSeconds * Double(rate)) else {
+            isReliable = false
             framesWritten += frameCount
             return 0
         }

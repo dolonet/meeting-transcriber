@@ -174,6 +174,12 @@ struct GeneralSettingsView: View {
                 )
                 .font(.caption)
                 .foregroundStyle(.secondary)
+                Text(
+                    "Notum imports app-call microphone audio only while Zoom or Telemost is confirmed unmuted. " +
+                        "Unknown states and one second near each boundary are excluded. Raw audio stays available locally.",
+                )
+                .font(.caption)
+                .foregroundStyle(.secondary)
             }
         } icon: {
             Image(systemName: "info.circle.fill")
